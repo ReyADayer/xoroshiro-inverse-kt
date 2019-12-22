@@ -1,6 +1,6 @@
 package app;
 
-class Xoroshiro {
+public class Xoroshiro {
     public static final long XOROSHIRO_CONST = 0x82A2B175229D6A5BL;
 
     final long[] s = { 0, 0 };

@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-class Matrix {
-    final long[] rows;
-    final int m;
+public class Matrix {
+    public final long[] rows;
+    public final int m;
 
     private Matrix(int m) {
         rows = new long[m];
@@ -18,6 +18,11 @@ class Matrix {
         this.m = rows.length;
     }
 
+    public Matrix(Matrix f) {
+        this.rows = Arrays.copyOf(f.rows, f.rows.length);
+        this.m = f.m;
+    }
+
     public static Matrix zeros(int m) {
         return new Matrix(m);
     }
@@ -25,7 +30,7 @@ class Matrix {
     public static Matrix ones(int m) {
         Matrix f = zeros(m);
         for (int i = 0; i < m; i++) {
-            f.setEntry(i, i, 1);
+            f.setEntry(i, i, (byte) 1);
         }
         return f;
     }
@@ -54,8 +59,8 @@ class Matrix {
         x[dst] ^= x[src];
     }
 
-    public int[] getColumn(int j) {
-        int[] column = new int[m];
+    public byte[] getColumn(int j) {
+        byte[] column = new byte[m];
         long b = 1L << (63 - j);
         for (int i = 0; i < m; i++) {
             if ((rows[i] & b) != 0)
@@ -65,16 +70,16 @@ class Matrix {
     }
 
     public Matrix swapColumns(int i, int j) {
-        int[] ci = getColumn(i);
-        int[] cj = getColumn(j);
+        byte[] ci = getColumn(i);
+        byte[] cj = getColumn(j);
         this.setColumn(j, ci);
         this.setColumn(i, cj);
         return this;
     }
 
     public Matrix addColumns(int src, int dst) {
-        int[] s = getColumn(src);
-        int[] d = getColumn(dst);
+        byte[] s = getColumn(src);
+        byte[] d = getColumn(dst);
         for (int i = 0; i < m; i++) {
             d[i] ^= s[i];
         }
@@ -82,27 +87,42 @@ class Matrix {
         return this;
     }
 
-    public Matrix trig() {
+    public Meta getEchelon() {
+        Matrix f = new Matrix(this); /* deep copy */
         int rank = 0;
-        for (int j = 63; j >= 0; j--) {
-            long b = 1L << j;
-            for (int i = rank; i < m; i++) {
-                if ((rows[i] & b) != 0) {
+        List<Integer> pivotslist = new ArrayList<>();
+        for (int j = 0; j < 64; j++) {
+            long b = 1L << (63 - j);
+            for (int i = rank; i < f.m; i++) {
+                if ((f.rows[i] & b) != 0) {
                     /* erase other rows */
-                    for (int k = i + 1; k < m; k++) {
-                        if ((rows[k] & b) != 0)
-                            addRows(i, k);
+                    for (int k = i + 1; k < f.m; k++) {
+                        if ((f.rows[k] & b) != 0)
+                            f.addRows(i, k);
                     }
-                    swapRows(i, rank);
+                    f.swapRows(i, rank);
+                    pivotslist.add(j);
                     rank++;
                     break;
                 }
             }
         }
-        return this;
+        int[] pivots = new int[pivotslist.size()];
+        for (int i = 0; i < pivots.length; i++) {
+            pivots[i] = pivotslist.get(i);
+        }
+        return new Meta(f, rank, pivots);
     }
 
-    public Matrix setEntry(int i, int j, int value) {
+    public int rank() {
+        return getEchelon().rank();
+    }
+
+    public int size() {
+        return m;
+    }
+
+    public Matrix setEntry(int i, int j, byte value) {
         if (value != 0) {
             long b = 0x8000000000000000L >>> j;
             rows[i] |= b;
@@ -113,18 +133,18 @@ class Matrix {
         return this;
     }
 
-    public Matrix setColumn(int j, int[] column) {
+    public Matrix setColumn(int j, byte[] column) {
         for (int i = 0; i < m; i++) {
             setEntry(i, j, column[i]);
         }
         return this;
     }
 
-    public int[] multVect(long v) {
-        int[] result = new int[m];
+    public byte[] multVect(long v) {
+        byte[] result = new byte[m];
         for (int i = 0; i < m; i++) {
             long p = rows[i] & v;
-            int q = 0;
+            byte q = 0;
             for (int j = 0; j < 64; j++) {
                 if (((1L << j) & p) != 0) {
                     q ^= 1;
@@ -135,14 +155,13 @@ class Matrix {
         return result;
     }
 
-    public List<Long> kernel() {
-        Matrix f = new Matrix(this.rows); /* deep copy */
-        f.trig(); /* triangulation doesn't affect the kernel */
+    public List<Long> kernelBasis() {
+        Meta f = getEchelon(); /* triangulation doesn't affect the kernel */
         Matrix q = Matrix.ones(64);
 
         int rank = 0;
         for (int i = 0; i < f.m; i++) {
-            for (int j = rank; i < 64; j++) {
+            for (int j = rank; j < 64; j++) {
                 long b = 1L << (63 - j);
                 if ((f.rows[i] & b) != 0) {
                     /* erase other columns */
@@ -153,6 +172,7 @@ class Matrix {
                             q.addRows(j, k);
                         }
                     }
+                    /* move pivot to diagonal */
                     f.swapColumns(j, rank);
                     q.swapRows(j, rank);
                     rank++;
@@ -160,9 +180,6 @@ class Matrix {
                 }
             }
         }
-        // for (long k : f.rows) {
-        //     System.out.printf("0x%016x%n", k);
-        // }
         List<Long> basis = new ArrayList<>();
         for (int i = rank; i < 64; i++) {
             basis.add(q.rows[i]);
@@ -170,45 +187,84 @@ class Matrix {
         return basis;
     }
 
-    public static Matrix f() {
-        int m = 57;
+    public static Matrix f(int flawlessIvs, int ivRerollment) {
+        int m = DenGenerator.pure(0, 0, flawlessIvs, ivRerollment).length;
         Matrix f = Matrix.zeros(m);
         for (int j = 0; j < 64; j++) {
             long b = 1L << (63 - j);
-            int[] column = DenGenerator.pure(b, 0);
+            byte[] column = DenGenerator.pure(b, 0, flawlessIvs, ivRerollment);
             f.setColumn(j, column);
         }
         return f;
     }
 
-    public static Matrix finv() {
+    public static Matrix finv(int flawlessIvs, int ivRerollment) {
         /*
          * left inverse like matrix
          * 
-         * (finv)^t*f=[1,*;0,0]
+         * (finv)^t*f=[diagonal 1 or 0; *] <- number of diagonal 1 equals to rank f
          */
-        int m = 57;
-        Matrix finv = Matrix.ones(m);
-        Matrix f = f();
+        Matrix f = f(flawlessIvs, ivRerollment);
+        Matrix f0 = Matrix.zeros(64);
+        for (int i = 0; i < f.m; i++) {
+            f0.rows[i] = f.rows[i];
+        }
+        Matrix finv = Matrix.ones(64);
         int rank = 0;
-        for (int j = 63; j >= 0; j--) {
-            long b = 1L << j;
-            for (int i = rank; i < f.m; i++) {
-                if ((f.rows[i] & b) != 0) {
+        List<Integer> pivotslist = new ArrayList<>();
+        for (int j = 0; j < 64; j++) {
+            long b = 1L << (63 - j);
+            for (int i = rank; i < f0.m; i++) {
+                if ((f0.rows[i] & b) != 0) {
                     /* erase other rows */
-                    for (int k = 0; k < f.m; k++) {
-                        if ((k != i) && (f.rows[k] & b) != 0) {
-                            f.addRows(i, k);
+                    for (int k = 0; k < f0.m; k++) {
+                        if ((k != i) && (f0.rows[k] & b) != 0) {
+                            f0.addRows(i, k);
                             finv.addColumns(i, k);
                         }
                     }
-                    f.swapRows(i, rank);
+                    f0.swapRows(i, rank);
                     finv.swapColumns(i, rank);
+                    pivotslist.add(j);
                     rank++;
                     break;
                 }
             }
         }
-        return finv;
+        for (int i = pivotslist.size() - 1; i >= 0; i--) {
+            int j = pivotslist.get(i);
+            f0.swapRows(i, j);
+            finv.swapColumns(i, j);
+        }
+        int generate = pivotslist.get(pivotslist.size() - 1);
+        long mask = -(1L << (63 - generate));
+        // long mask = -1L;
+        Matrix small = Matrix.zeros(f.m);
+        for (int i = 0; i < small.m; i++) {
+            small.rows[i] = finv.rows[i] & mask;
+        }
+        return small;
+    }
+
+    public static class Meta extends Matrix {
+        public final int rank;
+        public final int generate;
+        public final int[] pivots;
+
+        Meta(Matrix f, int rank, int[] pivots) {
+            super(f);
+            this.rank = rank;
+            this.pivots = Arrays.copyOf(pivots, pivots.length);
+            if (this.pivots.length > 0) {
+                generate = pivots[pivots.length - 1];
+            } else {
+                generate = 0;
+            }
+        }
+
+        @Override
+        public int rank() {
+            return rank;
+        }
     }
 }

@@ -4,15 +4,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-class DenGenerator {
-    public static int flawlessIvs = 1;
-
-    public static List<Integer> original(long seed/* , Entry pkmn */) {
+public class DenGenerator {
+    public static List<Integer> original(long seed, int flawlessIvs) {
         Xoroshiro rng = new Xoroshiro(seed);
-        int EC = (int) rng.nextInt();
-        int SIDTID = (int) rng.nextInt();
-        int PID = (int) rng.nextInt();
-        int shinytype = GetShinyType(PID, SIDTID);
+        for (int i = 0; i < 3; i++) {
+            rng.next();
+        }
         int[] ivs = { -1, -1, -1, -1, -1, -1 };
         long start = rng.i;
         for (int i = 0; i < flawlessIvs; i++) {
@@ -28,14 +25,10 @@ class DenGenerator {
         }
         long end = rng.i;
         int ability = (int) rng.nextInt(2);
-        int gender = (int)rng.nextInt(253) + 1;
-        int nature = (int)rng.nextInt(25);
-        
+        int gender = (int) rng.nextInt(253) + 1;
+        int nature = (int) rng.nextInt(25);
+
         System.out.printf("seed:0x%016x%n", seed);
-        // System.out.printf("EC:%08x%n", EC);
-        // System.out.printf("SIDTID:%08x%n", SIDTID);
-        // System.out.printf("PID:%08x%n", PID);
-        // System.out.printf("shinytype:%d%n", shinytype);
         System.out.printf("IVs:%s%n", Arrays.toString(ivs));
         System.out.printf("IV rollment:%d%n", end - start);
         System.out.printf("ability:%d%n", ability);
@@ -51,17 +44,20 @@ class DenGenerator {
         return result;
     }
 
-    public static int[] pure(long s0, long s1) {
+    public static byte[] pure(long s0, long s1, int flawlessIvs, int ivRerollment) {
         int m = 57;
-        int[] column = new int[m];
+        byte[] column = new byte[m];
         Xoroshiro rng = new Xoroshiro(s0, s1);
         rng.next();
         rng.next();
         rng.next();
+        for (int i = 0; i < ivRerollment; i++) {
+            rng.next();
+        }
         writeBE(rng.s[0], column, 0, 3);
         writeBE(rng.s[1], column, 3, 3);
         rng.next();
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6 - flawlessIvs; i++) {
             writeBE(rng.s[0], column, 6 + 10 * i, 5);
             writeBE(rng.s[1], column, 11 + 10 * i, 5);
             rng.next();
@@ -70,22 +66,22 @@ class DenGenerator {
         return column;
     }
 
-    public static int[] pure(long seed){
-        return pure(seed, Xoroshiro.XOROSHIRO_CONST);
+    public static byte[] pure(long seed, int flawlessIvs, int ivRerollment) {
+        return pure(seed, Xoroshiro.XOROSHIRO_CONST, flawlessIvs, ivRerollment);
     }
 
-    public static int[] linear(long seed) {
-        Matrix f = Matrix.f();
-        int[] v = f.multVect(seed);
-        int[] o = pure(0, Xoroshiro.XOROSHIRO_CONST);
+    public static byte[] linear(long seed, int flawlessIvs, int ivRerollment) {
+        Matrix f = Matrix.f(flawlessIvs, ivRerollment);
+        byte[] v = f.multVect(seed);
+        byte[] o = pure(0, Xoroshiro.XOROSHIRO_CONST, flawlessIvs, ivRerollment);
         for (int i = 0; i < o.length; i++) {
             v[i] ^= o[i];
         }
         return v;
     }
 
-    static boolean isGood(long seed) {
-        /* least iv rollment and no flawless ivs in chance */
+    static boolean isGood(long seed, int flawlessIvs, int ivRerollment) {
+        /* specified iv rollment and no 31 ivs in chance */
         Xoroshiro rng = new Xoroshiro(seed);
         rng.nextInt();
         rng.nextInt();
@@ -100,7 +96,7 @@ class DenGenerator {
             ivs[idx] = 31;
         }
         long end = rng.i;
-        if ((int) (end - start) != flawlessIvs) {
+        if ((int) (end - start) != flawlessIvs + ivRerollment) {
             return false;
         }
         for (int i = 0; i < 6; i++) {
@@ -114,25 +110,14 @@ class DenGenerator {
         return true;
     }
 
-    private static void writeBE(long src, int[] dst, int start, int length) {
+    private static void writeBE(long src, byte[] dst, int start, int length) {
         for (int i = 0; i < length; i++) {
-            long b = 1L << (length - 1 - i);
+            int b = 1 << (length - 1 - i);
             if ((src & b) != 0) {
                 dst[start + i] = 1;
             } else {
                 dst[start + i] = 0;
             }
         }
-    }
-
-    private static int GetShinyType(int pid, int tidsid) {
-        int a = (pid >>> 16) ^ (tidsid >>> 16);
-        int b = (pid & 0xFFFF) ^ (tidsid & 0xFFFF);
-        if (a == b) {
-            return 2; // square
-        } else if ((a ^ b) < 0x10) {
-            return 1; // star
-        }
-        return 0;
     }
 }
