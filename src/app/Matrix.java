@@ -187,24 +187,24 @@ public class Matrix {
         return basis;
     }
 
-    public static Matrix f(int flawlessIvs, int ivRerollment) {
-        int m = DenGenerator.pure(0, 0, flawlessIvs, ivRerollment).length;
+    public static Matrix f(int offsetLastFlawlessIdx, int offsetAdditionalBit) {
+        int m = DenGenerator.pure(0, 0, offsetLastFlawlessIdx, offsetAdditionalBit).length;
         Matrix f = Matrix.zeros(m);
         for (int j = 0; j < 64; j++) {
             long b = 1L << (63 - j);
-            byte[] column = DenGenerator.pure(b, 0, flawlessIvs, ivRerollment);
+            byte[] column = DenGenerator.pure(b, 0, offsetLastFlawlessIdx, offsetAdditionalBit);
             f.setColumn(j, column);
         }
         return f;
     }
 
-    public static Matrix finv(int flawlessIvs, int ivRerollment) {
+    public static Matrix finv(int offsetLastFlawlessIdx, int offsetAdditionalBit) {
         /*
          * left inverse like matrix
          * 
          * (finv)^t*f=[diagonal 1 or 0; *] <- number of diagonal 1 equals to rank f
          */
-        Matrix f = f(flawlessIvs, ivRerollment);
+        Matrix f = f(offsetLastFlawlessIdx, offsetAdditionalBit);
         Matrix f0 = Matrix.zeros(64);
         for (int i = 0; i < f.m; i++) {
             f0.rows[i] = f.rows[i];

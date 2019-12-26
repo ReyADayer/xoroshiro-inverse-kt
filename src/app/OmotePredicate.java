@@ -5,23 +5,21 @@ import java.util.List;
 import java.util.function.IntPredicate;
 
 public class OmotePredicate implements IntPredicate {
-
-    final int flawlessIdx;
-    final int[] ivs = new int[6];
-    final int[] flaws = new int[5];
-    final int ability;
-    final int nature;
-    final int[] nextlower = new int[6];
-    final int[] nextupper = new int[6];
-    final int nextability;
-    final int nextnature;
-    final private int flawlessIvs = 1;
-    final private int nextflawlessIvs;
-    final private int ivRerollment;
+    protected final List<Integer> flawlessIvsList;
+    protected final List<int[]> lowersList;
+    protected final List<int[]> uppersList;
+    protected final List<Integer> abilityTypesList;
+    protected final List<Integer> abilitiesList;
+    protected final List<Boolean> requireGenderList;
+    protected final List<Integer> natureList;
+    protected final int offsetLastFlawlessIdx;
+    protected final int lastFlawlessIdx;
+    protected final int[] flaws;
+    protected final int additionalBit;
 
     final Matrix finv;
 
-    final long xoroshiroequiv;
+    protected final long xoroshiroequiv;
 
     final long[] kernel;
 
@@ -34,41 +32,26 @@ public class OmotePredicate implements IntPredicate {
      *      + kernel
      */
 
-    public OmotePredicate(int flawlessIdx, int ivRerollment, int[] ivs, int ability, int nature, int nextflawlessIvs,
-            int[] nextlower, int[] nextupper, int nextability, int nextnature) {
-        this.flawlessIdx = flawlessIdx;
-        this.ivRerollment = ivRerollment;
-        List<Integer> flaws = new ArrayList<>();
-        for (int i = 0; i < ivs.length; i++) {
-            this.ivs[i] = ivs[i];
-            if (ivs[i] != 31) {
-                flaws.add(ivs[i]);
-            }
-        }
-        for (int i = 0; i < this.flaws.length; i++) {
-            this.flaws[i] = flaws.get(i);
-        }
-        this.ability = ability;
-        this.nature = nature;
-        // int tmpNextFlawlessIvs = 0;
-        // for (int i = 0; i < this.nextlower.length; i++) {
-        //     this.nextlower[i] = nextlower[i];
-        //     if (nextlower[i] == 31)
-        //         tmpNextFlawlessIvs++;
-        // }
-        // this.nextflawlessIvs = tmpNextFlawlessIvs;
-        this.nextflawlessIvs = nextflawlessIvs;
-        for (int i = 0; i < this.nextupper.length; i++) {
-            this.nextupper[i] = nextupper[i];
-            this.nextlower[i] = nextlower[i];
-        }
-        this.nextability = nextability;
-        this.nextnature = nextnature;
+    public OmotePredicate(List<Integer> flawlessIvsList, List<int[]> lowersList, List<int[]> uppersList,
+            List<Integer> abilityTypesList, List<Integer> abilitiesList, List<Boolean> requireGenderList,
+            List<Integer> natureList, int offsetLastFlawlessIdx, int lastFlawlessIdx, int[] flaws, int additionalBit,
+            int offsetAdditionalBit) {
+        this.flawlessIvsList = flawlessIvsList;
+        this.lowersList = lowersList;
+        this.uppersList = uppersList;
+        this.abilitiesList = abilitiesList;
+        this.abilityTypesList = abilityTypesList;
+        this.requireGenderList = requireGenderList;
+        this.natureList = natureList;
+        this.offsetLastFlawlessIdx = offsetLastFlawlessIdx;
+        this.lastFlawlessIdx = lastFlawlessIdx;
+        this.flaws = flaws;
+        this.additionalBit = additionalBit;
         {
-            finv = Matrix.finv(flawlessIvs, ivRerollment);
+            finv = Matrix.finv(offsetLastFlawlessIdx, offsetAdditionalBit);
         }
         {
-            final Matrix f = Matrix.f(flawlessIvs, ivRerollment);
+            final Matrix f = Matrix.f(offsetLastFlawlessIdx, offsetAdditionalBit);
             List<Long> basislist = f.kernelBasis();
             int dim = basislist.size();
             int card = 1 << dim;
@@ -88,7 +71,7 @@ public class OmotePredicate implements IntPredicate {
             }
         }
         {
-            byte[] x = DenGenerator.linear(0, flawlessIvs, ivRerollment);
+            byte[] x = DenGenerator.linear(0, offsetLastFlawlessIdx, offsetAdditionalBit);
             long tmp = 0;
             for (int i = 0; i < x.length; i++) {
                 if (x[i] != 0) {
@@ -110,7 +93,7 @@ public class OmotePredicate implements IntPredicate {
             omote >>>= 5;
         }
         int flawlessIdx0 = omote & 0x7;
-        int flawlessIdx1 = (flawlessIdx - flawlessIdx0) & 0x7;
+        int flawlessIdx1 = (lastFlawlessIdx - flawlessIdx0) & 0x7;
 
         byte[] x = new byte[57];
         writeBE(flawlessIdx0, x, 0, 3);
@@ -119,7 +102,7 @@ public class OmotePredicate implements IntPredicate {
             writeBE(iv0[i], x, 6 + 10 * i, 5);
             writeBE(iv1[i], x, 11 + 10 * i, 5);
         }
-        writeBE(ability, x, 56, 1);
+        writeBE(additionalBit, x, 56, 1);
         long finvx = 0;
         for (int i = 0; i < x.length; i++) {
             if (x[i] != 0) {
@@ -128,19 +111,32 @@ public class OmotePredicate implements IntPredicate {
         }
         for (int i = 0; i < kernel.length; i++) {
             long seed0 = xoroshiroequiv ^ finvx ^ kernel[i];
-            long seed1 = seed0 + Xoroshiro.XOROSHIRO_CONST;
-            if (ivAbilityNature(seed1, nextflawlessIvs, nextlower, nextupper, nextability, nextnature)) {
-                if (ivAbilityNature(seed0, flawlessIvs, ivs, ivs, ability, nature)) {
-                    System.out.printf("0x%016x%n", seed0);
-                    return true;
+            int size = flawlessIvsList.size();
+            boolean result = true;
+            for (int j = size - 1; j >= 0; j--) {
+                long seed = seed0 + Xoroshiro.XOROSHIRO_CONST * j;
+                int flawlessIvs = flawlessIvsList.get(j);
+                int[] lower = lowersList.get(j);
+                int[] upper = uppersList.get(j);
+                int abilityType = abilityTypesList.get(j);
+                int ability = abilitiesList.get(j);
+                boolean requireGender = requireGenderList.get(j);
+                int nature = natureList.get(j);
+                result &= ivAbilityNature(seed, flawlessIvs, lower, upper, abilityType, ability, requireGender, nature);
+                if (!result) {
+                    break;
                 }
+            }
+            if (result) {
+                System.out.printf("0x%016x%n", seed0);
+                return true;
             }
         }
         return false;
     }
 
-    private static boolean ivAbilityNature(long seed, int flawlessIvs, int[] lower, int[] upper, int ability,
-            int nature) {
+    protected static boolean ivAbilityNature(long seed, int flawlessIvs, int[] lower, int[] upper, int abilityType,
+            int ability, boolean requireGender, int nature) {
         long s0 = seed;
         long s1 = Xoroshiro.XOROSHIRO_CONST;
         for (int i = 0; i < 3; i++) {
@@ -178,27 +174,45 @@ public class OmotePredicate implements IntPredicate {
                 s1 = rotl(s1, 37);
             }
         }
-        int tmpability;
-        {
-            int temper = (int) (s0 + s1);
-            s1 ^= s0;
-            s0 = rotl(s0, 24) ^ s1 ^ (s1 << 16);
-            s1 = rotl(s1, 37);
-            tmpability = temper & 0x1;
-            if (ability != tmpability) {
+        { // ability
+            int tmpability;
+            if (abilityType == 4) { // hidden
+                do {
+                    int temper = (int) (s0 + s1);
+                    tmpability = temper & 0x3;
+                    s1 ^= s0;
+                    s0 = rotl(s0, 24) ^ s1 ^ (s1 << 16);
+                    s1 = rotl(s1, 37);
+                } while (tmpability >= 3);
+            } else {
+                int temper = (int) (s0 + s1);
+                tmpability = temper & 0x1;
+                s1 ^= s0;
+                s0 = rotl(s0, 24) ^ s1 ^ (s1 << 16);
+                s1 = rotl(s1, 37);
+            }
+            boolean match;
+            if (ability == -1) { // ordinary
+                match = (tmpability == 0) || (tmpability == 1);
+            } else {
+                match = tmpability == ability;
+            }
+            if (!match) {
                 return false;
             }
         }
-        int tmp;
-        do { // gender
-            int temper = (int) (s0 + s1);
-            tmp = temper & 0xff;
-            s1 ^= s0;
-            s0 = rotl(s0, 24) ^ s1 ^ (s1 << 16);
-            s1 = rotl(s1, 37);
-        } while (tmp >= 253);
-        int tmpnature;
+        if (requireGender) {
+            int tmp;
+            do { // gender
+                int temper = (int) (s0 + s1);
+                tmp = temper & 0xff;
+                s1 ^= s0;
+                s0 = rotl(s0, 24) ^ s1 ^ (s1 << 16);
+                s1 = rotl(s1, 37);
+            } while (tmp >= 253);
+        }
         {
+            int tmpnature;
             do {
                 int temper = (int) (s0 + s1);
                 tmpnature = temper & 0x1f;
@@ -213,7 +227,7 @@ public class OmotePredicate implements IntPredicate {
         return true;
     }
 
-    private static void writeBE(int src, byte[] dst, int start, int length) {
+    protected static void writeBE(int src, byte[] dst, int start, int length) {
         for (int i = 0; i < length; i++) {
             int b = 1 << (length - 1 - i);
             if ((src & b) != 0) {
@@ -228,72 +242,84 @@ public class OmotePredicate implements IntPredicate {
         return (x << k) | (x >>> (64 - k));
     }
 
-    static class IVPredicateBuilder {
-        int flawlessIdx;
-        int ivRerollment;
-        int[] ivs = new int[5];
-        int ability;
-        int nature;
-        int nextflawlessIvs;
-        int[] nextupper = new int[6];
-        int[] nextlower = new int[6];
-        int nextability;
-        int nextnature;
+    public static class IVPredicateBuilder {
+        List<Integer> flawlessIvsList;
+        List<int[]> lowersList;
+        List<int[]> uppersList;
+        List<Integer> abilityTypesList;
+        List<Integer> abilitiesList;
+        List<Boolean> requireGenderList;
+        List<Integer> natureList;
+        int offsetLastFlawlessIdx;
+        int lastFlawlessIdx;
+        int[] flaws;
+        int additionalBit;
+        int offsetAdditionalBit;
 
         public OmotePredicate getIncetance() {
-            return new OmotePredicate(flawlessIdx, ivRerollment, ivs, ability, nature, nextflawlessIvs, nextlower,
-                    nextupper, nextability, nextnature);
+            return new OmotePredicate(flawlessIvsList, lowersList, uppersList, abilityTypesList, abilitiesList,
+                    requireGenderList, natureList, offsetLastFlawlessIdx, lastFlawlessIdx, flaws, additionalBit,
+                    offsetAdditionalBit);
         }
 
-        public IVPredicateBuilder setFlawlessIdx(int flawlessIdx) {
-            this.flawlessIdx = flawlessIdx;
+        public IVPredicateBuilder setLastFlawlessIdx(int lastFlawlessIdx) {
+            this.lastFlawlessIdx = lastFlawlessIdx;
             return this;
         }
 
-        public IVPredicateBuilder setIvRerollment(int ivRerollment) {
-            this.ivRerollment = ivRerollment;
+        public IVPredicateBuilder setOffsetLastFlawlessIdx(int offsetLastFlawlessIdx) {
+            this.offsetLastFlawlessIdx = offsetLastFlawlessIdx;
             return this;
         }
 
-        public IVPredicateBuilder setIvs(int[] ivs) {
-            this.ivs = ivs;
+        public IVPredicateBuilder setFlaws(int[] flaws) {
+            this.flaws = flaws;
             return this;
         }
 
-        public IVPredicateBuilder setAbility(int ability) {
-            this.ability = ability;
+        public IVPredicateBuilder setAdditionalBit(int bit) {
+            this.additionalBit = bit;
             return this;
         }
 
-        public IVPredicateBuilder setNextFlawlessIvs(int nextflawlessIvs) {
-            this.nextflawlessIvs = nextflawlessIvs;
+        public IVPredicateBuilder setFlawlessIvsList(List<Integer> flawlessIvsList) {
+            this.flawlessIvsList = flawlessIvsList;
             return this;
         }
 
-        public IVPredicateBuilder setNextLower(int[] ivs) {
-            this.nextlower = ivs;
+        public IVPredicateBuilder setLowersList(List<int[]> lowersList) {
+            this.lowersList = lowersList;
             return this;
         }
 
-        public IVPredicateBuilder setNextUpper(int[] ivs) {
-            this.nextupper = ivs;
+        public IVPredicateBuilder setUppersList(List<int[]> uppersList) {
+            this.uppersList = uppersList;
             return this;
         }
 
-        public IVPredicateBuilder setNextAbility(int nextability) {
-            this.nextability = nextability;
+        public IVPredicateBuilder setAbilitiesList(List<Integer> abilitiesList) {
+            this.abilitiesList = abilitiesList;
             return this;
         }
 
-        public IVPredicateBuilder setNature(int nature) {
-            this.nature = nature;
+        public IVPredicateBuilder setRequireGenderList(List<Boolean> requireGenderList) {
+            this.requireGenderList = requireGenderList;
             return this;
         }
 
-        public IVPredicateBuilder setNextnature(int nextnature) {
-            this.nextnature = nextnature;
+        public IVPredicateBuilder setNatureList(List<Integer> natureList) {
+            this.natureList = natureList;
             return this;
         }
 
+        public IVPredicateBuilder setAbilityTypesList(List<Integer> abilityTypesList) {
+            this.abilityTypesList = abilityTypesList;
+            return this;
+        }
+
+        public IVPredicateBuilder setOffsetAdditionalBit(int offsetAdditionalBits) {
+            this.offsetAdditionalBit = offsetAdditionalBits;
+            return this;
+        }
     }
 }
