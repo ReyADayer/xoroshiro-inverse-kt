@@ -4,20 +4,6 @@ import java.util.*;
 import java.util.stream.IntStream;
 
 public class App {
-    public final static String VERSION = "1.3";
-    public final static String MESSAGE_i1 = "enter precise IVs of the 1st raid pokemon";
-    public final static String MESSAGE_r1 = "enter rest of consecutive IVs";
-    public final static String MESSAGE_star = "enter number of stars of %s raid pokemon";
-    public final static String MESSAGE_lower = "enter lower bounds of IVs of the %s raid pokemon";
-    public final static String MESSAGE_upper = "enter upper bounds of IVs of the %s raid pokemon";
-    public final static String MESSAGE_ability_type = "Was there a chance that the %s raid has a hidden ability?";
-    public final static String MESSAGE_ability = "enter an ability of the %s raid pokemon%n(0/1/ignore)";
-    public final static String MESSAGE_hidden_ability = "enter an ability of the %s raid pokemon%n(0/1/ordinary/hidden)";
-    public final static String MESSAGE_gender = "Did the %s raid pokemon require gender evaluation?";
-    public final static String MESSAGE_nature = "enter nature of the %s raid pokemon%n(en or ja):";
-    public final static String MESSAGE_EC = String.format("enter the lowest bit of EC of the 1st raid pokemon%ntype \"ignore\" not to take account of this.");
-    public final static String MESSAGE_quit = "seed(s) found. are you sure to quit now?";
-
     public final static Map<String, Integer> natureDict = new HashMap<>();
     static {
         String[] ja = { "がんばりや", "さみしがり", "ゆうかん", "いじっぱり", "やんちゃ", "ずぶとい", "すなお", "のんき", "わんぱく", "のうてんき", "おくびょう",
@@ -69,7 +55,7 @@ public class App {
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.printf("xoroshiro inverse %s%n", VERSION);
+        System.out.printf("xoroshiro inverse %s%n", Messages.VERSION);
         System.out.println("press ctrl+c to exit");
         System.out.printf("this program supports ONLY the cases that the pokemons have no 31 IV in chance%n");
         boolean debug = false;
@@ -102,7 +88,7 @@ public class App {
         int minOffset, maxOffset;
         int[] ivs1 = new int[6];
         while (true) {
-            inputIvs(ivs1, MESSAGE_i1);
+            inputIvs(ivs1, Messages.MESSAGE_i1);
             int flawlessIvs = countFlawlessIvs(ivs1);
             if (flawlessIvs == 0) {
                 System.out.println("wrong ivs");
@@ -130,7 +116,7 @@ public class App {
         }
         if (series.size() < 5) {
             int[] complement = new int[5 - series.size()];
-            inputIvs(complement, MESSAGE_r1);
+            inputIvs(complement, Messages.MESSAGE_r1);
             for (int i = 0; i < complement.length; i++) {
                 int r = complement[i];
                 series.add(r);
@@ -145,11 +131,11 @@ public class App {
         while (information < 64) {
             int next = num + 1;
             String ordered = order(next);
-            int nextStars = inputInteger(String.format(MESSAGE_star, ordered), 1, 5);
+            int nextStars = inputInteger(String.format(Messages.MESSAGE_star, ordered), 1, 5);
             int[] nextLowers = new int[6];
             int[] nextUppers = new int[6];
-            inputIvs(nextLowers, String.format(MESSAGE_lower, ordered));
-            inputIvs(nextUppers, String.format(MESSAGE_upper, ordered));
+            inputIvs(nextLowers, String.format(Messages.MESSAGE_lower, ordered));
+            inputIvs(nextUppers, String.format(Messages.MESSAGE_upper, ordered));
             lowersList.add(nextLowers);
             uppersList.add(nextUppers);
             List<Integer> nextFlawlessIvsList = check(nextStars, nextLowers, nextUppers);
@@ -169,15 +155,15 @@ public class App {
         }
         for (int i = 1; i <= num; i++) {
             String ordered = order(i);
-            boolean hidden = inputYesNo(String.format(MESSAGE_ability_type, ordered));
+            boolean hidden = inputYesNo(String.format(Messages.MESSAGE_ability_type, ordered));
             int ability;
             if (hidden) {
-                ability = inputEntry(String.format(MESSAGE_hidden_ability, ordered), hiddenDict);
+                ability = inputEntry(String.format(Messages.MESSAGE_hidden_ability, ordered), hiddenDict);
             } else {
-                ability = inputEntry(String.format(MESSAGE_ability, ordered), abilityDict);
+                ability = inputEntry(String.format(Messages.MESSAGE_ability, ordered), abilityDict);
             }
-            boolean requireGender = inputYesNo(String.format(MESSAGE_gender, ordered));
-            int nature = inputEntry(String.format(MESSAGE_nature, ordered), natureDict);
+            boolean requireGender = inputYesNo(String.format(Messages.MESSAGE_gender, ordered));
+            int nature = inputEntry(String.format(Messages.MESSAGE_nature, ordered), natureDict);
             abilityTypesList.add(hidden ? 4 : 3);
             abilitiesList.add(ability);
             requireGenderList.add(requireGender);
@@ -191,7 +177,7 @@ public class App {
             probableAdditionalBits.add(abilitiesList.get(0));
             offsetAdditionalBits = 1;
         } else {
-            int ec = inputEntry(MESSAGE_EC, ECDict);
+            int ec = inputEntry(Messages.MESSAGE_EC, ECDict);
             offsetAdditionalBits = 0;
             if (ec != -1) {
                 probableAdditionalBits.add(ec);
@@ -237,7 +223,7 @@ public class App {
                         if (debug) {
                             quitLoop = true;
                         } else {
-                            quitLoop = inputYesNo(MESSAGE_quit);
+                            quitLoop = inputYesNo(Messages.MESSAGE_quit);
                         }
                     }
                     if (quitLoop) {

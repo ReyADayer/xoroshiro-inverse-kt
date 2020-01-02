@@ -1,58 +1,55 @@
-package xoroshiro.inverse;
+package xoroshiro.inverse
 
-public class Xoroshiro {
-    public static final long XOROSHIRO_CONST = 0x82A2B175229D6A5BL;
+class Xoroshiro {
+    @JvmField
+    val s = longArrayOf(0, 0)
+    @JvmField
+    var i: Long = 0
 
-    public final long[] s = { 0, 0 };
-
-    long i;
-
-    static long rotl(long x, int k) {
-        return (x << k) | (x >>> (64 - k));
+    constructor(seed: Long) {
+        s[0] = seed
+        s[1] = XOROSHIRO_CONST
     }
 
-    public Xoroshiro(long seed) {
-        s[0] = seed;
-        s[1] = XOROSHIRO_CONST;
+    constructor(s0: Long, s1: Long) {
+        s[0] = s0
+        s[1] = s1
     }
 
-    public Xoroshiro(long s0, long s1) {
-        s[0] = s0;
-        s[1] = s1;
+    operator fun next(): Long {
+        val s0 = s[0]
+        var s1 = s[1]
+        val result = s0 + s1
+        s1 = s1 xor s0
+        s[0] = rotl(s0, 24) xor s1 xor (s1 shl 16)
+        s[1] = rotl(s1, 37)
+        i++
+        return result
     }
 
-    public long next() {
-        long s0 = s[0];
-        long s1 = s[1];
-        long result = s0 + s1;
-
-        s1 ^= s0;
-        s[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16);
-        s[1] = rotl(s1, 37);
-
-        i++;
-
-        return result;
-    }
-
-    private static long nextP2(long n) {
-        n--;
-        for (int i = 0; i < 6; i++) {
-            n |= n >>> (1 << i);
-        }
-        return n;
-    }
-
-    public long nextInt(long MOD) {
-        long res = 0;
-        long p2mod = nextP2(MOD);
+    @JvmOverloads
+    fun nextInt(mod: Long = 0xFFFFFFFFL): Long {
+        var res: Long = 0
+        val p2mod = nextP2(mod)
         do {
-            res = next() & p2mod;
-        } while (res >= MOD);
-        return res;
+            res = next() and p2mod
+        } while (res >= mod)
+        return res
     }
 
-    public long nextInt() {
-        return nextInt(0xFFFFFFFFL);
+    companion object {
+        const val XOROSHIRO_CONST = -0x7d5d4e8add6295a5L
+        fun rotl(x: Long, k: Int): Long {
+            return x shl k or (x ushr 64 - k)
+        }
+
+        private fun nextP2(n: Long): Long {
+            var n = n
+            n--
+            for (i in 0..5) {
+                n = n or n ushr (1 shl i)
+            }
+            return n
+        }
     }
 }
