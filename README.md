@@ -2,6 +2,17 @@
 
 ポケモン剣盾のレイドseed特定ツールです．
 
+## ビルド方法
+
+IntelliJ IDEAでgradle buildを実行
+または
+
+```
+./gradlew build
+```
+
+を実行後、build/libs配下にjarファイルが生成される。
+
 ## 起動方法
 
 `xoroshiroinverse.jar` をダウンロードした後，同じディレクトリ内で次を実行:

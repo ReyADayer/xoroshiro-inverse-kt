@@ -44,12 +44,12 @@ class Xoroshiro {
         }
 
         private fun nextP2(n: Long): Long {
-            var n = n
-            n--
+            var result = n
+            result--
             for (i in 0..5) {
-                n = n or n ushr (1 shl i)
+                result = result or result ushr (1 shl i)
             }
-            return n
+            return result
         }
     }
 }

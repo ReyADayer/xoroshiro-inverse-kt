@@ -4,55 +4,11 @@ import java.util.*;
 import java.util.stream.IntStream;
 
 public class App {
-    public final static Map<String, Integer> natureDict = new HashMap<>();
-    static {
-        String[] ja = { "がんばりや", "さみしがり", "ゆうかん", "いじっぱり", "やんちゃ", "ずぶとい", "すなお", "のんき", "わんぱく", "のうてんき", "おくびょう",
-                "せっかち", "まじめ", "ようき", "むじゃき", "ひかえめ", "おっとり", "れいせい", "てれや", "うっかりや", "おだやか", "おとなしい", "なまいき", "しんちょう",
-                "きまぐれ" };
-        String[] en_capital = { "Hardy", "Lonely", "Brave", "Adamant", "Naughty", "Bold", "Docile", "Relaxed", "Impish",
-                "Lax", "Timid", "Hasty", "Serious", "Jolly", "Naive", "Modest", "Mild", "Quiet", "Bashful", "Rash",
-                "Calm", "Gentle", "Sassy", "Careful", "Quirky" };
-        String[] en_small = { "hardy", "lonely", "brave", "adamant", "naughty", "bold", "docile", "relaxed", "impish",
-                "lax", "timid", "hasty", "serious", "jolly", "naive", "modest", "mild", "quiet", "bashful", "rash",
-                "calm", "gentle", "sassy", "careful", "quirky" };
-        for (int i = 0; i < en_small.length; i++) {
-            natureDict.put(ja[i], i);
-            natureDict.put(en_capital[i], i);
-            natureDict.put(en_small[i], i);
-        }
-    }
-
-    public final static Map<String, Integer> abilityDict = new HashMap<>();
-    static {
-        abilityDict.put("ignore", -1);
-        abilityDict.put("0", 0);
-        abilityDict.put("1", 1);
-    }
-
-    public final static Map<String, Integer> hiddenDict = new HashMap<>();
-    static {
-        hiddenDict.put("ordinary", -1);
-        hiddenDict.put("0", 0);
-        hiddenDict.put("1", 1);
-        hiddenDict.put("hidden", 2);
-    }
-
-    public final static Map<String, Integer> ECDict = new HashMap<>();
-    static {
-        ECDict.put("ignore", -1);
-        ECDict.put("0", 0);
-        ECDict.put("1", 1);
-    }
-
-    final static Map<Integer, List<Integer>> star2flawlessIvs;
-    static {
-        star2flawlessIvs = new HashMap<>(5);
-        star2flawlessIvs.put(1, Arrays.asList(1));
-        star2flawlessIvs.put(2, Arrays.asList(1, 2));
-        star2flawlessIvs.put(3, Arrays.asList(2, 3));
-        star2flawlessIvs.put(4, Arrays.asList(3, 4));
-        star2flawlessIvs.put(5, Arrays.asList(4));
-    }
+    public final static Map<String, Integer> natureDict = Dict.createNatureDict();
+    public final static Map<String, Integer> abilityDict = Dict.createAbilityDict();
+    public final static Map<String, Integer> hiddenDict = Dict.createHiddenDict();
+    public final static Map<String, Integer> ECDict = Dict.createEcDict();
+    final static Map<Integer, List<Integer>> star2flawlessIvs = Dict.createStar2flawlessIvs();
 
     public static void main(String[] args) throws Exception {
         System.out.printf("xoroshiro inverse %s%n", Messages.VERSION);
@@ -76,7 +32,7 @@ public class App {
     }
 
     public static boolean search(boolean debug, int debugIvRecalculation, int omote_lower_bound_inclusive,
-            int omote_upper_bound_inclusive) {
+                                 int omote_upper_bound_inclusive) {
         List<Integer> flawlessIvsList = new ArrayList<>();
         final List<int[]> lowersList = new ArrayList<>();
         final List<int[]> uppersList = new ArrayList<>();
@@ -199,7 +155,8 @@ public class App {
         List<Integer> omoList = new ArrayList<>();
         boolean quitLoop = false;
         boolean found = false;
-        label_outer: for (int offsetLastFlawlessIdx = minOffset; offsetLastFlawlessIdx <= maxOffset; offsetLastFlawlessIdx++) {
+        label_outer:
+        for (int offsetLastFlawlessIdx = minOffset; offsetLastFlawlessIdx <= maxOffset; offsetLastFlawlessIdx++) {
             System.out.printf("suppose the number of seeds before the last flawless IV is %d...%n",
                     offsetLastFlawlessIdx);
             for (int lastFlawlessIdx : probableFlawlessIdx) {
